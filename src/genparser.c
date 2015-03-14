@@ -110,6 +110,7 @@ private LANGMAP langmap[] = {
   { LANG_CSHARP, "csharp", ".cs", ".csy" },
   { LANG_AS, "as", ".as", ".asy" },
   { LANG_HSP, "hsp", ".hsp", ".hspy" },
+  { LANG_D, "d", ".d", ".dy" },
   { -1, NULL, NULL, NULL }
 };
 
@@ -155,7 +156,7 @@ global int get_lang_id()
 void print_line(int ln, char *fn)
 {
   switch (language->id) {
-  case LANG_C: case LANG_CPP:
+  case LANG_C: case LANG_CPP: case LANG_D:
     if (!lflag)
       fprintf(ofp, "#line %d \"%s\"\n", ln, fn);
   }
@@ -354,7 +355,7 @@ char *enough_type(short *p, int n)
     return "byte";
   case LANG_CSHARP:
     return "sbyte";
-  case LANG_AS:
+  case LANG_AS: case LANG_D:
   	return "int";
   default:
     unsupported();
