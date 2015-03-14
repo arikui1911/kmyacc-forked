@@ -40,6 +40,7 @@
 #define LANG_CSHAPR	9
 #define LANG_AS		10
 #define LANG_HSP	11
+#define LANG_D      12
 
 #endif /* global */
 
@@ -109,6 +110,7 @@ private LANGMAP langmap[] = {
   { LANG_CSHARP, "csharp", ".cs", ".csy" },
   { LANG_AS, "as", ".as", ".asy" },
   { LANG_HSP, "hsp", ".hsp", ".hspy" },
+  { LANG_D, "d", ".d", ".dy" },
   { -1, NULL, NULL, NULL }
 };
 
@@ -154,7 +156,7 @@ global int get_lang_id()
 void print_line(int ln, char *fn)
 {
   switch (language->id) {
-  case LANG_C: case LANG_CPP:
+  case LANG_C: case LANG_CPP: case LANG_D:
     if (!lflag)
       fprintf(ofp, "#line %d \"%s\"\n", ln, fn);
   }
@@ -184,16 +186,14 @@ void init_lang()
 {
   switch (language->id) {
   case LANG_C:
-    break;
+    return;
   case LANG_PERL:
     /* In Perl, $$, $1, $2... are inhibited */
     iflag = YES;
-    /* fall thru */
-  default:
-    /* Enables semantic value reference by name except C language. */
-    nflag = YES;
     break;
   }
+  /* Enables semantic value reference by name except C language. */
+  nflag = YES;
 }
 
 
@@ -285,6 +285,20 @@ global char *parser_header_filename(char *pref, char *yacc_filename)
 
 void def_semval_macro(char *);
 void set_metachar(char *);
+void class_name(char *buf, char *filename);
+
+void before_insert_include(){
+  switch (language->id) {
+  case LANG_D:
+    {
+      char *buf = malloc(strlen(outfilename) + 1);
+      if (!buf) die("out of memory");
+      class_name(buf, outfilename);
+      fprintf(ofp, "module %s;\n", buf);
+    }
+    break;
+  }
+}
 
 /* Initialize parser generator. */
 global void parser_create(char *fn, bool tflag)
@@ -316,10 +330,9 @@ global void parser_create(char *fn, bool tflag)
     else
       fputs(line, ofp);
   }
+  before_insert_include();
 }
 
-
-  
 
 global void parser_begin_copying()
 {
@@ -353,7 +366,7 @@ char *enough_type(short *p, int n)
     return "byte";
   case LANG_CSHARP:
     return "sbyte";
-  case LANG_AS:
+  case LANG_AS: case LANG_D:
   	return "int";
   default:
     unsupported();
@@ -530,8 +543,6 @@ global char *parser_dollar(int dollartype, int nth, int len, char *typename)
   return buf;
 }
 
-        
-
 /* Make class name from filename */
 void class_name(char *buf, char *filename)
 {
@@ -541,6 +552,27 @@ void class_name(char *buf, char *filename)
   s++;
   strncpy(buf, s, p - s);
   buf[p - s] = '\0';
+}
+
+void class_name_camel(char *buf, char *filename)
+{
+  int i, j, cobb;
+  char *base = malloc(strlen(filename) + 1);
+
+  if (!base) die("out of memory");
+  class_name(base, filename);
+
+  for (cobb = 1, i = 0, j = 0; base[i] != '\0'; i++){
+    if (cobb) {
+      buf[j++] = toupper(base[i]);
+      cobb = 0;
+    } else if (base[i] == '_') {
+      cobb = 1;
+    } else {
+      buf[j++] = base[i];
+    }
+    buf[j] = '\0';
+  }
 }
 
 
@@ -663,6 +695,8 @@ void gen_valueof(char *buf, char *var)
     sprintf(buf, "%d", yybasesize - nnonleafstates);
   else if (strcmp(var, "CLASSNAME") == 0)
     class_name(buf, outfilename);
+  else if (strcmp(var, "CLASSNAME_CAMEL") == 0)
+    class_name_camel(buf, outfilename);
   else if (strcmp(var, "-p") == 0)
     strcpy(buf, pspref ? pspref : "yy");
   else {
