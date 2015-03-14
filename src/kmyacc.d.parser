@@ -28,7 +28,7 @@ $tokenval
 immutable %s = %n;
 $endtokenval
 
-public class Parser {
+public class $(CLASSNAME_CAMEL)Parser {
     /*
     #define yyclearin (yychar = -1)
     #define yyerrok (yyerrflag = 0)
