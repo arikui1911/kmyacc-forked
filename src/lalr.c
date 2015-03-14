@@ -167,6 +167,7 @@ int item2pnum(Gsym *p)
       return (i);
   }
   die("item2pnum(): can't happen");
+  return 0;   // never reached
 }
 
 
@@ -704,6 +705,8 @@ int cmpprec(int pnum, Gsym x)
   case A_NON:		/* Non-associative, error */
     return (NON_ASSOC);
   }
+  assert(0);
+  return 0;   // never reached
 }
 
 
