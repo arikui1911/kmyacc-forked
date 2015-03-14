@@ -29,6 +29,19 @@ immutable %s = %n;
 $endtokenval
 
 public class $(CLASSNAME_CAMEL)Parser {
+$if -t
+    static immutable YYDEBUG = true;
+$endif
+$ifnot -t
+    static immutable YYDEBUG = false;
+$endif
+$if -a
+    static immutable YYACT = true;
+$endif
+$ifnot -a
+    static immutable YYACT = false;
+$endif
+
     /*
     #define yyclearin (yychar = -1)
     #define yyerrok (yyerrflag = 0)
@@ -36,7 +49,7 @@ public class $(CLASSNAME_CAMEL)Parser {
     #define YYERROR  goto yyerrlab
     */
 
-    static  bool yydebug = false;
+    private bool yydebug;
     private YYSTYPE yylval;     // lexical element object
     private YYSTYPE yyval;      // Semantic value
     private YYSTYPE yyastk[];   // Semantic stack
@@ -45,240 +58,248 @@ public class $(CLASSNAME_CAMEL)Parser {
     private int yyerrflag;      // Error handling state
     private int yychar;         // lookahead token
 
-    this(){}
+    this(){
+        yydebug = false;
+    }
+
+    this(bool debug_flag){
+        this();
+        yydebug = debug_flag;
+    }
 
     $tailcode;
 
-$if -t
-    /* Dump Parse Tree Flag */
-    static bool yyDumpParseTree = false;
+    static if (YYDEBUG) {
+        /* Dump Parse Tree Flag */
+        static bool yyDumpParseTree = false;
 
-    /* Dense Tree */
-    static bool yydense = false;
+        /* Dense Tree */
+        static bool yydense = false;
 
-    /** Parse Tree **/
-    public static abstract class YYParseTree {
-        public void prettyPrint(File output) {
-            prettyPrintX(output, "", true);
-        }
-
-        abstract void prettyPrintX(File output, string head, bool last);
-    }
-
-    /** YYNode represents nonterminal symbol. **/
-    public static class YYNode : YYParseTree {
-        int id;
-        int nkids;
-        YYParseTree[] kids;
-
-        this(int id, YYParseTree[] stack, int from, int len) {
-            this.id = id;
-            nkids = len;
-            kids = new YYParseTree[len];
-            for (int i = 0; i < len; i++) kids[i] = stack[from + i];
-        }
-
-        void appendKids(YYParseTree[] stack, int from, int len) {
-            if (nkids + len > kids.length) {
-                int size = kids.length * 2;
-                if (size < nkids + len) size = nkids + len;
-                YYParseTree[] a = new YYParseTree[size];
-                for (int i = 0; i < nkids; i++) a[i] = kids[i];
-                kids = a;
+        /** Parse Tree **/
+        public static abstract class YYParseTree {
+            public void prettyPrint(File output) {
+                prettyPrintX(output, "", true);
             }
-            for (int i = 0; i < len; i++) kids[nkids + i] = stack[from + i];
-            nkids += len;
+
+            abstract void prettyPrintX(File output, string head, bool last);
         }
 
-        override void prettyPrintX(File output, string head, bool last) {
-            auto head2 = head;
-            if (head.length != 0) {
-                if (last) {
-                    head2 = head ~ " +-"; /* L */
-                } else {
-                    head2 = head ~ " +-"; /* T-rotated-left */
+        /** YYNode represents nonterminal symbol. **/
+        public static class YYNode : YYParseTree {
+            int id;
+            int nkids;
+            YYParseTree[] kids;
+
+            this(int id, YYParseTree[] stack, int from, int len) {
+                this.id = id;
+                nkids = len;
+                kids = new YYParseTree[len];
+                for (int i = 0; i < len; i++) kids[i] = stack[from + i];
+            }
+
+            void appendKids(YYParseTree[] stack, int from, int len) {
+                if (nkids + len > kids.length) {
+                    int size = kids.length * 2;
+                    if (size < nkids + len) size = nkids + len;
+                    YYParseTree[] a = new YYParseTree[size];
+                    for (int i = 0; i < nkids; i++) a[i] = kids[i];
+                    kids = a;
+                }
+                for (int i = 0; i < len; i++) kids[nkids + i] = stack[from + i];
+                nkids += len;
+            }
+
+            override void prettyPrintX(File output, string head, bool last) {
+                auto head2 = head;
+                if (head.length != 0) {
+                    if (last) {
+                        head2 = head ~ " +-"; /* L */
+                    } else {
+                        head2 = head ~ " +-"; /* T-rotated-left */
+                    }
+                }
+                output.writeln(head2 ~ yynonterms[id]);
+                head ~= last ? "   " : " | ";
+                for (int i = 0; i < nkids; i++) {
+                    if (!yydense) output.writefln("%s | ", head);
+                    if (i + 1 != nkids) {
+                        kids[i].prettyPrintX(output, head, false);
+                    } else {
+                        kids[i].prettyPrintX(output, head, true);
+                    }
                 }
             }
-            output.writeln(head2 ~ yynonterms[id]);
-            head ~= last ? "   " : " | ";
-            for (int i = 0; i < nkids; i++) {
-                if (!yydense) output.writefln("%s | ", head);
-                if (i + 1 != nkids) {
-                    kids[i].prettyPrintX(output, head, false);
-                } else {
-                    kids[i].prettyPrintX(output, head, true);
-                }
+
+            override public string toString() {
+                import std.string;
+                import std.algorithm;
+
+                return "(%s %s)".format(yynonterms[id], kids.map!(x => x.toString()).join(" "));
             }
         }
 
-        override public string toString() {
-            import std.string;
-            import std.algorithm;
+        /** YYLeaf represents terminal symbol. **/
+        public static class YYLeaf : YYParseTree {
+            int id;
+            YYSTYPE value;
 
-            return "(%s %s)".format(yynonterms[id], kids.map!(x => x.toString()).join(" "));
-        }
-    }
-
-    /** YYLeaf represents terminal symbol. **/
-    public static class YYLeaf : YYParseTree {
-        int id;
-        YYSTYPE value;
-
-        this(int id) {
-            this.id = id;
-        }
-
-        this(int id, YYSTYPE value) {
-            this(id);
-            this.value = value;
-        }
-
-        override void prettyPrintX(File output, string head, bool last) {
-            auto head2 = head;
-            if (head.length != 0) {
-                if (last) {
-                    head2 = head ~ " +-"; /* L */
-                } else {
-                    head2 = head ~ " +-"; /* T-rotated-left */
-                }
+            this(int id) {
+                this.id = id;
             }
-            output.writeln(head2 ~ toString());
+
+            this(int id, YYSTYPE value) {
+                this(id);
+                this.value = value;
+            }
+
+            override void prettyPrintX(File output, string head, bool last) {
+                auto head2 = head;
+                if (head.length != 0) {
+                    if (last) {
+                        head2 = head ~ " +-"; /* L */
+                    } else {
+                        head2 = head ~ " +-"; /* T-rotated-left */
+                    }
+                }
+                output.writeln(head2 ~ toString());
+            }
+
+            override public string toString() {
+                return "%s[%f]".format(yyterminals[id], value.number);
+            }
         }
 
-        override public string toString() {
-            return "%s[%f]".format(yyterminals[id], value.number);
+        private YYParseTree[] yyPTStack; // Parse Tree Stack
+
+        private static immutable string[] yyterminals = [
+            $listvar terminals
+            , "???"
+        ];
+
+        private static immutable string[] yynonterms = [
+            $listvar nonterminals
+        ];
+
+        private string yytokname(int n) {
+            switch (n) {
+            $switch-for-token-name;
+            default:
+                return "???";
+            }
+        }
+
+        private static immutable string[] yyproduction = [
+            $production-strings;
+        ];
+
+        /* Traditional Debug Mode */
+        private void YYTRACE_NEWSTATE(int state, int sym) {
+            if (!yydebug) return;
+            "%% State %d, Lookahead %s".writefln(state, (sym < 0 ? "--none--" : yyterminals[sym]));
+        }
+
+        private void YYTRACE_READ(int sym) {
+            if (!yydebug) return;
+            "%% Reading %s".writefln(yyterminals[sym]);
+        }
+
+        private void YYTRACE_SHIFT(int sym) {
+            if (!yydebug) return;
+            "%% Shift %s".writefln(yyterminals[sym]);
+        }
+
+        private void YYTRACE_ACCEPT() {
+            if (!yydebug) return;
+            "% Accepted.".writeln();
+        }
+
+        private void YYTRACE_REDUCE(int n) {
+            if (!yydebug) return;
+            "%% Reduce by (%s) ".writefln(yyproduction[n]);
+        }
+
+        private void YYTRACE_POP(int state) {
+            if (!yydebug) return;
+            "%% Recovering, uncovers state %d".writefln(state);
+        }
+
+        private void YYTRACE_DISCARD(int sym) {
+            if (!yydebug) return;
+            "%% Discard %s".writefln(yyterminals[sym]);
         }
     }
 
-    private YYParseTree[] yyPTStack; // Parse Tree Stack
-
-    private static final string yyterminals[] = [
-        $listvar terminals
-        , "???"
-    ];
-
-    private static final string yynonterms[] = [
-        $listvar nonterminals
-    ];
-
-    private string yytokname(int n) {
-        switch (n) {
-        $switch-for-token-name;
-        default:
-            return "???";
-        }
-    }
-
-    private static final string yyproduction[] = [
-        $production-strings;
-    ];
-
-    /* Traditional Debug Mode */
-    private void YYTRACE_NEWSTATE(int state, int sym) {
-        if (!yydebug) return;
-        "%% State %d, Lookahead %s".writefln(state, (sym < 0 ? "--none--" : yyterminals[sym]));
-    }
-
-    private void YYTRACE_READ(int sym) {
-        if (!yydebug) return;
-        "%% Reading %s".writefln(yyterminals[sym]);
-    }
-
-    private void YYTRACE_SHIFT(int sym) {
-        if (!yydebug) return;
-        "%% Shift %s".writefln(yyterminals[sym]);
-    }
-
-    private void YYTRACE_ACCEPT() {
-        if (!yydebug) return;
-        "%% Accepted.".writeln();
-    }
-
-    private void YYTRACE_REDUCE(int n) {
-        if (!yydebug) return;
-        "%% Reduce by (%s) ".writefln(yyproduction[n]);
-    }
-
-    private void YYTRACE_POP(int state) {
-        if (!yydebug) return;
-        "%% Recovering, uncovers state %d".writefln(state);
-    }
-
-    private void YYTRACE_DISCARD(int sym) {
-        if (!yydebug) return;
-        "%% Discard %s".writefln(yyterminals[sym]);
-    }
-$endif
-
-    private static final $TYPEOF(yytranslate)[] yytranslate = [
+    private static immutable $TYPEOF(yytranslate)[] yytranslate = [
         $listvar yytranslate
     ];
 
-    private static final int YYBADCH = $(YYBADCH);
-    private static final int YYMAXLEX = $(YYMAXLEX);
-    private static final int YYTERMS = $(YYTERMS);
-    private static final int YYNONTERMS = $(YYNONTERMS);
+    private static immutable int YYBADCH = $(YYBADCH);
+    private static immutable int YYMAXLEX = $(YYMAXLEX);
+    private static immutable int YYTERMS = $(YYTERMS);
+    private static immutable int YYNONTERMS = $(YYNONTERMS);
 
-    private static final short[] yyaction = [
+    private static immutable short[] yyaction = [
         $listvar yyaction
     ];
 
-    private static final int YYLAST = $(YYLAST);
+    private static immutable int YYLAST = $(YYLAST);
 
-    private static final $TYPEOF(yycheck)[] yycheck = [
+    private static immutable $TYPEOF(yycheck)[] yycheck = [
         $listvar yycheck
     ];
 
-    private static final short[] yybase = [
+    private static immutable short[] yybase = [
         $listvar yybase
     ];
 
-    private static final int YY2TBLSTATE = $(YY2TBLSTATE);
+    private static immutable int YY2TBLSTATE = $(YY2TBLSTATE);
 
-    private static final short[] yydefault = [
+    private static immutable short[] yydefault = [
         $listvar yydefault
     ];
 
-    private static final short[] yygoto = [
+    private static immutable short[] yygoto = [
         $listvar yygoto
     ];
 
-    private static final int YYGLAST = $(YYGLAST);
+    private static immutable int YYGLAST = $(YYGLAST);
 
-    private static final $TYPEOF(yygcheck)[] yygcheck = [
+    private static immutable $TYPEOF(yygcheck)[] yygcheck = [
         $listvar yygcheck
     ];
 
-    private static final short[] yygbase = [
+    private static immutable short[] yygbase = [
         $listvar yygbase
     ];
 
-    private static final short[] yygdefault = [
+    private static immutable short[] yygdefault = [
         $listvar yygdefault
     ];
 
-    private static final $TYPEOF(yylhs)[] yylhs = [
+    private static immutable $TYPEOF(yylhs)[] yylhs = [
         $listvar yylhs
     ];
 
-    private static final $TYPEOF(yylen)[] yylen = [
+    private static immutable $TYPEOF(yylen)[] yylen = [
         $listvar yylen
     ];
 
-    private static final int YYSTATES = $(YYSTATES);
-    private static final int YYNLSTATES = $(YYNLSTATES);
-    private static final int YYINTERRTOK = $(YYINTERRTOK);
-    private static final int YYUNEXPECTED = $(YYUNEXPECTED);
-    private static final int YYDEFAULT = $(YYDEFAULT);
-$if -a
-$reduce
-    private void yyact%n() {
-        %b
-    }
-$endreduce
-$endif
+    private static immutable int YYSTATES = $(YYSTATES);
+    private static immutable int YYNLSTATES = $(YYNLSTATES);
+    private static immutable int YYINTERRTOK = $(YYINTERRTOK);
+    private static immutable int YYUNEXPECTED = $(YYUNEXPECTED);
+    private static immutable int YYDEFAULT = $(YYDEFAULT);
 
-    private static final int YYDEFAULTSTACK = 512;
+    static if (YYACT) {
+$reduce
+        private void yyact%n() {
+            %b
+        }
+$endreduce
+    }
+
+    private static immutable int YYDEFAULTSTACK = 512;
 
     // Grow syntax and sematic stacks
     private void growStack() {
@@ -300,9 +321,10 @@ $endif
 
         yyastk = new YYSTYPE[YYDEFAULTSTACK];
         yysstk = new short[YYDEFAULTSTACK];
-$if -t
-        if (yyDumpParseTree) yyPTStack = new YYParseTree[YYDEFAULTSTACK];
-$endif
+
+        static if (YYDEBUG) {
+            if (yyDumpParseTree) yyPTStack = new YYParseTree[YYDEFAULTSTACK];
+        }
 
         int yystate = 0;
         int yychar1 = yychar = -1;
@@ -311,180 +333,165 @@ $endif
         yysstk[yysp] = 0;
         yyerrflag = 0;
         for (;;) {
-$if -t
-            YYTRACE_NEWSTATE(yystate, yychar1);
-$endif
+            static if (YYDEBUG) YYTRACE_NEWSTATE(yystate, yychar1);
             if (yybase[yystate] == 0) {
                 yyn = yydefault[yystate];
             } else {
                 if (yychar < 0) {
                     if ((yychar = yylex()) <= 0) yychar = 0;
                     yychar1 = yychar < YYMAXLEX ? yytranslate[yychar] : YYBADCH;
-$if -t
-                    YYTRACE_READ(yychar1);
-$endif
-            }
+                    static if (YYDEBUG) YYTRACE_READ(yychar1);
+                }
 
-            if (((yyn = yybase[yystate] + yychar1) >= 0
-                 && yyn < YYLAST && yycheck[yyn] == yychar1
-                 || (yystate < YY2TBLSTATE
-                     && (yyn = yybase[yystate + YYNLSTATES] + yychar1) >= 0
-                     && yyn < YYLAST && yycheck[yyn] == yychar1))
-                && (yyn = yyaction[yyn]) != YYDEFAULT) {
-                /*
-                 * >= YYNLSTATE: shift and reduce
-                 * > 0: shift
-                 * = 0: accept
-                 * < 0: reduce
-                 * = -YYUNEXPECTED: error
-                 */
-                if (yyn > 0) {
-                    /* shift */
-$if -t
-                    YYTRACE_SHIFT(yychar1);
-$endif
-                    if (++yysp >= yysstk.length) growStack();
+                if (((yyn = yybase[yystate] + yychar1) >= 0
+                     && yyn < YYLAST && yycheck[yyn] == yychar1
+                     || (yystate < YY2TBLSTATE
+                         && (yyn = yybase[yystate + YYNLSTATES] + yychar1) >= 0
+                         && yyn < YYLAST && yycheck[yyn] == yychar1))
+                    && (yyn = yyaction[yyn]) != YYDEFAULT) {
+                    /*
+                     * >= YYNLSTATE: shift and reduce
+                     * > 0: shift
+                     * = 0: accept
+                     * < 0: reduce
+                     * = -YYUNEXPECTED: error
+                     */
+                    if (yyn > 0) {
+                        /* shift */
+                        static if (YYDEBUG) YYTRACE_SHIFT(yychar1);
+                        if (++yysp >= yysstk.length) growStack();
 
-                    yysstk[yysp] = cast(short)(yystate = yyn);
-                    yyastk[yysp] = yylval;
-$if -t
-                    if (yyDumpParseTree) yyPTStack[yysp] = new YYLeaf(yychar1, yylval);
-$endif
-                    yychar1 = yychar = -1;
+                        yysstk[yysp] = cast(short)(yystate = yyn);
+                        yyastk[yysp] = yylval;
+                        static if (YYDEBUG) {
+                            if (yyDumpParseTree) yyPTStack[yysp] = new YYLeaf(yychar1, yylval);
+                        }
+                        yychar1 = yychar = -1;
 
-                    if (yyerrflag > 0) yyerrflag--;
-                    if (yyn < YYNLSTATES) continue;
+                        if (yyerrflag > 0) yyerrflag--;
+                        if (yyn < YYNLSTATES) continue;
 
-                    /* yyn >= YYNLSTATES means shift-and-reduce */
-                    yyn -= YYNLSTATES;
+                        /* yyn >= YYNLSTATES means shift-and-reduce */
+                        yyn -= YYNLSTATES;
+                    } else {
+                        yyn = -yyn;
+                    }
                 } else {
-                    yyn = -yyn;
+                    yyn = yydefault[yystate];
                 }
-            } else {
-                yyn = yydefault[yystate];
-            }
-        }
-
-        for (;;) {
-            /* reduce/error */
-            if (yyn == 0) {
-                /* accept */
-$if -t
-                YYTRACE_ACCEPT();
-                if (yyDumpParseTree) {
-                    yyPTStack[yysp].prettyPrint(stdout);
-                    stdout.flush();
-                }
-$endif
-                return 0;
             }
 
-            bool yyparseerror = true;
-            if (yyn != YYUNEXPECTED) {
-                /* reduce */
-                yyparseerror = false;
-                yyl = yylen[yyn];
-                yyval = yyastk[yysp-yyl+1];
-$if -t
-                YYTRACE_REDUCE(yyn);
-$endif
-	            int yylrec = 0;
-                /* Following line will be replaced by reduce actions */
-$if -a
-                switch(yyn) {
-$reduce
-                case %n:
-                    yyact%n();
-                    break;
-$endreduce
-                }
-$endif
-$ifnot -a
-                switch(yyn) {
-$reduce
-                case %n:
-                    {
-                        %b
+            for (;;) {
+                /* reduce/error */
+                if (yyn == 0) {
+                    /* accept */
+                    static if (YYDEBUG) {
+                        YYTRACE_ACCEPT();
+                        if (yyDumpParseTree) {
+                            yyPTStack[yysp].prettyPrint(stdout);
+                            stdout.flush();
+                        }
                     }
-                    break;
-$endreduce
-                default:
-                    break;
+                    return 0;
                 }
-$endif
-	            if (!yyparseerror) {
-$if -t
-                    if (yyDumpParseTree) {
-                        if (yylrec != 0)
-                            (cast(YYNode)yyPTStack[yysp-yyl+1]).appendKids(yyPTStack, yysp-yyl+2, yyl-1);
+
+                bool yyparseerror = true;
+                if (yyn != YYUNEXPECTED) {
+                    /* reduce */
+                    yyparseerror = false;
+                    yyl = yylen[yyn];
+                    yyval = yyastk[yysp-yyl+1];
+                    static if (YYDEBUG) YYTRACE_REDUCE(yyn);
+    	            int yylrec = 0;
+                    /* Following line will be replaced by reduce actions */
+                    static if (YYACT) {
+                        switch(yyn) {
+$reduce
+                        case %n:
+                            yyact%n();
+                            break;
+$endreduce
+                        default:
+                            break;
+                        }
+                    } else {
+                        switch(yyn) {
+$reduce
+                        case %n:
+                            {
+                                %b
+                            }
+                            break;
+$endreduce
+                        default:
+                            break;
+                        }
+                    }
+    	            if (!yyparseerror) {
+                        static if (YYDEBUG) {
+                            if (yyDumpParseTree) {
+                                if (yylrec != 0)
+                                    (cast(YYNode)yyPTStack[yysp-yyl+1]).appendKids(yyPTStack, yysp-yyl+2, yyl-1);
+                                else
+                                    yyPTStack[yysp-yyl+1] = new YYNode(yylhs[yyn], yyPTStack, yysp-yyl+1, yyl);
+                            }
+                        }
+                        /* Goto - shift nonterminal */
+                        yysp -= yyl;
+                        yyn = yylhs[yyn];
+                        if ((yyp = yygbase[yyn] + yysstk[yysp]) >= 0 && yyp < YYGLAST && yygcheck[yyp] == yyn)
+                            yystate = yygoto[yyp];
                         else
-                            yyPTStack[yysp-yyl+1] = new YYNode(yylhs[yyn], yyPTStack, yysp-yyl+1, yyl);
+                            yystate = yygdefault[yyn];
+
+                        if (++yysp >= yysstk.length) growStack();
+
+                        yysstk[yysp] = cast(short)yystate;
+                        yyastk[yysp] = yyval;
                     }
-$endif
-                    /* Goto - shift nonterminal */
-                    yysp -= yyl;
-                    yyn = yylhs[yyn];
-                    if ((yyp = yygbase[yyn] + yysstk[yysp]) >= 0 && yyp < YYGLAST && yygcheck[yyp] == yyn)
-                        yystate = yygoto[yyp];
-                    else
-                        yystate = yygdefault[yyn];
-
-                    if (++yysp >= yysstk.length) growStack();
-
-                    yysstk[yysp] = cast(short)yystate;
-                    yyastk[yysp] = yyval;
                 }
-            }
 
-            if (yyparseerror) {
-                /* error */
-                switch (yyerrflag) {
-                case 0:
-                    yyerror("syntax error");
-                case 1:
-                case 2:
-                    yyerrflag = 3;
-                    /* Pop until error-expecting state uncovered */
+                if (yyparseerror) {
+                    /* error */
+                    switch (yyerrflag) {
+                    case 0:
+                        yyerror("syntax error");
+                    case 1:
+                    case 2:
+                        yyerrflag = 3;
+                        /* Pop until error-expecting state uncovered */
 
-                    while (!((yyn = yybase[yystate] + YYINTERRTOK) >= 0
-                             && yyn < YYLAST && yycheck[yyn] == YYINTERRTOK
-                             || (yystate < YY2TBLSTATE
-                                 && (yyn = yybase[yystate + YYNLSTATES] + YYINTERRTOK) >= 0
-                                 && yyn < YYLAST && yycheck[yyn] == YYINTERRTOK))) {
-                        if (yysp <= 0) return 1;
-                        yystate = yysstk[--yysp];
-$if -t
-                        YYTRACE_POP(yystate);
-$endif
+                        while (!((yyn = yybase[yystate] + YYINTERRTOK) >= 0
+                                 && yyn < YYLAST && yycheck[yyn] == YYINTERRTOK
+                                 || (yystate < YY2TBLSTATE
+                                     && (yyn = yybase[yystate + YYNLSTATES] + YYINTERRTOK) >= 0
+                                     && yyn < YYLAST && yycheck[yyn] == YYINTERRTOK))) {
+                            if (yysp <= 0) return 1;
+                            yystate = yysstk[--yysp];
+                            static if (YYDEBUG) YYTRACE_POP(yystate);
+                        }
+                        yyn = yyaction[yyn];
+                        static if (YYDEBUG) YYTRACE_SHIFT(YYINTERRTOK);
+                        yysstk[++yysp] = cast(short)(yystate = yyn);
+                        static if (YYDEBUG) {
+                            if (yyDumpParseTree) yyPTStack[yysp] = new YYLeaf(YYINTERRTOK);
+                        }
+                        break;
+
+                    case 3:
+                        static if (YYDEBUG) YYTRACE_DISCARD(yychar1);
+                        if (yychar1 == 0) return 1;
+                	    yychar1 = yychar = -1;
+                        break;
+                    default:
+                        break;
                     }
-                    yyn = yyaction[yyn];
-$if -t
-                    YYTRACE_SHIFT(YYINTERRTOK);
-$endif
-                    yysstk[++yysp] = cast(short)(yystate = yyn);
-$if -t
-                    if (yyDumpParseTree) yyPTStack[yysp] = new YYLeaf(YYINTERRTOK);
-$endif
-                    break;
-
-                case 3:
-$if -t
-                    YYTRACE_DISCARD(yychar1);
-$endif
-                    if (yychar1 == 0) return 1;
-            	    yychar1 = yychar = -1;
-                    break;
-                default:
-                    break;
                 }
-            }
 
-            if (yystate < YYNLSTATES) break;
-            /* >= YYNLSTATES means shift-and-reduce */
-            yyn = yystate - YYNLSTATES;
+                if (yystate < YYNLSTATES) break;
+                /* >= YYNLSTATES means shift-and-reduce */
+                yyn = yystate - YYNLSTATES;
+            }
         }
     }
 }
-
-}
-
