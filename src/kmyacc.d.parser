@@ -42,13 +42,6 @@ $ifnot -a
     static immutable YYACT = false;
 $endif
 
-    /*
-    #define yyclearin (yychar = -1)
-    #define yyerrok (yyerrflag = 0)
-    #define YYRECOVERING (yyerrflag != 0)
-    #define YYERROR  goto yyerrlab
-    */
-
     private bool yydebug;
     private YYSTYPE yylval;     // lexical element object
     private YYSTYPE yyval;      // Semantic value
@@ -57,17 +50,24 @@ $endif
     private int yysp;           // Stack pointer
     private int yyerrflag;      // Error handling state
     private int yychar;         // lookahead token
+    private bool yyparseerror;
 
-    this(){
-        yydebug = false;
+    @property void YYERROR(){ yyparseerror = true; }
+    @property void yyclearin(){ yychar = -1; }
+    @property void yyerrok(){ yyerrflag = 0; }
+    @property bool YYRECOVERING(){ return yyerrflag != 0; }
+
+    int delegate(ref YYSTYPE) yylex_dg;
+    int delegate(string) yyerror_dg;
+
+    this (int delegate(ref YYSTYPE) yylex_dg, int delegate(string) yyerror_dg, bool debug_flag = false) {
+        this.yylex_dg   = yylex_dg;
+        this.yyerror_dg = yyerror_dg;
+        this.yydebug    = debug_flag;
     }
 
-    this(bool debug_flag){
-        this();
-        yydebug = debug_flag;
-    }
-
-    $tailcode;
+    private int yylex(){ return this.yylex_dg(yylval); }
+    private int yyerror(string s){ return this.yyerror_dg(s); }
 
     static if (YYDEBUG) {
         /* Dump Parse Tree Flag */
@@ -395,7 +395,7 @@ $endreduce
                     return 0;
                 }
 
-                bool yyparseerror = true;
+                yyparseerror = true;
                 if (yyn != YYUNEXPECTED) {
                     /* reduce */
                     yyparseerror = false;
@@ -495,3 +495,5 @@ $endreduce
         }
     }
 }
+
+$tailcode;
