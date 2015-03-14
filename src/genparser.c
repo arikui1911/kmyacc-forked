@@ -40,6 +40,7 @@
 #define LANG_CSHAPR	9
 #define LANG_AS		10
 #define LANG_HSP	11
+#define LANG_D      12
 
 #endif /* global */
 
