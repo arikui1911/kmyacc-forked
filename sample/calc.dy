@@ -1,0 +1,149 @@
+%{
+import std.stdio;
+import std.ascii;
+import std.string;
+import std.conv;
+
+%}
+
+%union {
+    double number;
+}
+
+%token ADD SUB MUL DIV CR
+
+%token<number> NUMBER_LITERAL
+
+%type<number> expr term primary
+
+%%
+
+program :
+        | line_list
+        ;
+
+line_list : line
+          | line_list line
+          ;
+
+line : CR
+     | expr CR
+     {
+         ">>> %f".writefln($1);
+     }
+     ;
+
+expr : term
+     | expr ADD term
+     {
+         $$ = $1 + $3;
+     }
+     | expr SUB term
+     {
+         $$ = $1 - $3;
+     }
+     ;
+
+term : primary
+     | term MUL primary
+     {
+         $$ = $1 * $3;
+     }
+     | term DIV primary
+     {
+         $$ = $1 / $3;
+     }
+     ;
+
+primary : NUMBER_LITERAL
+        ;
+
+%%
+
+void main(){
+    auto l = new Lexer(stdin);
+    auto p = new CalcParser(&l.lex, &l.on_error, true);
+    p.yyparse();
+}
+
+class Lexer {
+    private File src;
+    private File err_out;
+    private string cur_line;
+    private uint cur_pos;
+
+    this (File src, File err_out = stderr) {
+        this.src = src;
+        this.err_out = err_out;
+    }
+
+    int on_error(string msg){
+        err_out.writefln("Error: %s", msg);
+        return 0;
+    }
+
+    private enum State {
+        INITIAL,
+        NUMBER,
+        FLOAT,
+    }
+
+    int lex(ref YYSTYPE yylval){
+        // check buffering line
+        if (cur_pos >= cur_line.length) {
+            cur_pos = 0;
+            cur_line = src.readln();
+            if (cur_line.length == 0) return 0;    // EOF
+        }
+
+        auto buf = new char[0];
+        auto state = State.INITIAL;
+
+        while (cur_pos < cur_line.length) {
+            auto c = cur_line[cur_pos++];
+            final switch (state) {
+            case State.INITIAL:
+                if (c.isWhite()) {
+                    ;
+                } else if (c.isDigit()) {
+                    buf ~= c;
+                    state = State.NUMBER;
+                } else {
+                    switch (c) {
+                    case '+': return ADD;
+                    case '-': return SUB;
+                    case '*': return MUL;
+                    case '/': return DIV;
+                    default:
+                        on_error("invalid character - `%c'".format(c));
+                        return 0;
+                    }
+                }
+                break;
+            case State.NUMBER:
+                if (c == '.') {
+                    buf ~= c;
+                    state = State.FLOAT;
+                } else if (c.isDigit()) {
+                    buf ~= c;
+                } else {
+                    cur_pos--;
+                    yylval.number = buf.to!double();
+                    return NUMBER_LITERAL;
+                }
+                break;
+            case State.FLOAT:
+                if (c.isDigit()) {
+                    buf ~= c;
+                } else {
+                    cur_pos--;
+                    yylval.number = buf.to!double();
+                    return NUMBER_LITERAL;
+                }
+                break;
+            }
+        }
+
+        return CR;
+    }
+}
