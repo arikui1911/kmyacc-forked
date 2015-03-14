@@ -543,8 +543,6 @@ global char *parser_dollar(int dollartype, int nth, int len, char *typename)
   return buf;
 }
 
-        
-
 /* Make class name from filename */
 void class_name(char *buf, char *filename)
 {
@@ -554,6 +552,27 @@ void class_name(char *buf, char *filename)
   s++;
   strncpy(buf, s, p - s);
   buf[p - s] = '\0';
+}
+
+void class_name_camel(char *buf, char *filename)
+{
+  int i, j, cobb;
+  char *base = malloc(strlen(filename) + 1);
+
+  if (!base) die("out of memory");
+  class_name(base, filename);
+
+  for (cobb = 1, i = 0, j = 0; base[i] != '\0'; i++){
+    if (cobb) {
+      buf[j++] = toupper(base[i]);
+      cobb = 0;
+    } else if (base[i] == '_') {
+      cobb = 1;
+    } else {
+      buf[j++] = base[i];
+    }
+    buf[j] = '\0';
+  }
 }
 
 
@@ -676,6 +695,8 @@ void gen_valueof(char *buf, char *var)
     sprintf(buf, "%d", yybasesize - nnonleafstates);
   else if (strcmp(var, "CLASSNAME") == 0)
     class_name(buf, outfilename);
+  else if (strcmp(var, "CLASSNAME_CAMEL") == 0)
+    class_name_camel(buf, outfilename);
   else if (strcmp(var, "-p") == 0)
     strcpy(buf, pspref ? pspref : "yy");
   else {
