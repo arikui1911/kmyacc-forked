@@ -12,8 +12,6 @@ $semval(%n,%t) yyastk[yysp-(%l-%n)].%t
 
 $include;
 
-module $(CLASSNAME);
-
 $if -t
 static if (!__traits(compiles, std.stdio)) import std.stdio;
 $endif

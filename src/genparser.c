@@ -186,16 +186,14 @@ void init_lang()
 {
   switch (language->id) {
   case LANG_C:
-    break;
+    return;
   case LANG_PERL:
     /* In Perl, $$, $1, $2... are inhibited */
     iflag = YES;
-    /* fall thru */
-  default:
-    /* Enables semantic value reference by name except C language. */
-    nflag = YES;
     break;
   }
+  /* Enables semantic value reference by name except C language. */
+  nflag = YES;
 }
 
 
@@ -287,6 +285,20 @@ global char *parser_header_filename(char *pref, char *yacc_filename)
 
 void def_semval_macro(char *);
 void set_metachar(char *);
+void class_name(char *buf, char *filename);
+
+void before_insert_include(){
+  switch (language->id) {
+  case LANG_D:
+    {
+      char *buf = malloc(strlen(outfilename) + 1);
+      if (!buf) die("out of memory");
+      class_name(buf, outfilename);
+      fprintf(ofp, "module %s;\n", buf);
+    }
+    break;
+  }
+}
 
 /* Initialize parser generator. */
 global void parser_create(char *fn, bool tflag)
@@ -318,10 +330,9 @@ global void parser_create(char *fn, bool tflag)
     else
       fputs(line, ofp);
   }
+  before_insert_include();
 }
 
-
-  
 
 global void parser_begin_copying()
 {
