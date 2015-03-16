@@ -1,0 +1,292 @@
+# Prototype file of Ruby parser.
+# Written by arikui <arikui.ruby _at_ gmail.com>
+# This file is PUBLIC DOMAIN.
+
+$semval($) yyval
+$semval($,%t) yyval
+$semval(%n) yyastk[yysp-(%l-%n)]
+$semval(%n,%t) yyastk[yysp-(%l-%n)]
+$include
+
+YYDEFAULTSTACK = 512
+
+$tokenval
+%s = %n
+$endtokenval
+
+	
+#	#define yyclearin (yychar = -1)
+#	#define yyerrok (yyerrflag = 0)
+#	#define YYRECOVERING (yyerrflag != 0)
+#	#define YYERROR	goto yyerrlab
+
+
+# Debug mode flag
+@yydebug = false
+
+# lexical element object
+@yylval = nil
+
+$if -t
+
+def yytracef
+	@YYTRACEF ||= STDERR
+end
+
+YYTERMINALS = [
+	$listvar terminals , "???"
+]
+
+YYPRODUCTION = [
+	$production-strings
+]
+
+# Traditional Debug Mode
+def YYTRACE_NEWSTATE(state, sym)
+	yytracef.puts "% State #{state}, Lookahead #{sym < 0 ? '--none--' : YYTERMINALS[sym]}"
+end
+
+def YYTRACE_READ(sym)
+	return unless @yydebug
+	yytracef.puts "% Reading #{YYTERMINALS[sym]}"
+end
+
+def YYTRACE_SHIFT(sym)
+	return unless @yydebug
+	yytracef.puts "% Shift #{YYTERMINALS[sym]}"
+end
+
+def YYTRACE_ACCEPT
+	return unless @yydebug
+	yytracef.puts "% Accepted."
+end
+
+def YYTRACE_REDUCE(n)
+	return unless @yydebug
+	yytracef.puts "% Reduce by (#{n}) #{YYPRODUCTION[n]}"
+end
+
+def YYTRACE_POP(state)
+	return unless @yydebug
+	yytracef.puts "% Recovering, uncovers state #{state}"
+end
+
+def YYTRACE_DISCARD(sym)
+	return unless @yydebug
+	yytracef.puts "% Discard #{YYTERMINALS[sym]}"
+end
+$endif
+
+YYTRANSLATE = [
+	$listvar yytranslate
+].freeze
+
+YYBADCH = $(YYBADCH)
+YYMAXLEX = $(YYMAXLEX)
+YYTERMS = $(YYTERMS)
+YYNONTERMS = $(YYNONTERMS)
+
+YYACTION = [
+	$listvar yyaction
+].freeze
+
+YYLAST = $(YYLAST)
+
+YYCHECK = [
+	$listvar yycheck
+].freeze
+
+YYBASE = [
+	$listvar yybase
+].freeze
+
+YY2TBLSTATE = $(YY2TBLSTATE)
+
+YYDEFAULTS = [
+	$listvar yydefault
+].freeze
+
+YYGOTO = [
+	$listvar yygoto
+].freeze
+
+YYGLAST = $(YYGLAST)
+
+YYGCHECK = [
+	$listvar yygcheck
+].freeze
+
+YYGBASE = [
+	$listvar yygbase
+].freeze
+
+YYGDEFAULTS = [
+	$listvar yygdefault
+].freeze
+
+YYLHS = [
+	$listvar yylhs
+].freeze
+
+YYLEN = [
+	$listvar yylen
+].freeze
+
+YYSTATES = $(YYSTATES)
+YYNLSTATES = $(YYNLSTATES)
+YYINTERRTOK = $(YYINTERRTOK)
+YYUNEXPECTED = $(YYUNEXPECTED)
+YYDEFAULT = $(YYDEFAULT)
+
+# Parser entry point
+def yyparse()
+	r = 0...YYDEFAULTSTACK
+	yyastk = r.to_a
+	yysstk = r.to_a
+
+	yystate = 0
+	yychar = -1
+
+	yysp = 0
+	yysstk[yysp] = 0
+	yyerrflag = 0
+	while true
+$if -t
+		YYTRACE_NEWSTATE(yystate, yychar)
+$endif
+		if YYBASE[yystate] == 0
+			yyn = YYDEFAULTS[yystate]
+		else
+			if yychar < 0
+				yychar = yylex()
+				yychar = 0 if yychar <= 0
+				yychar = (yychar < YYMAXLEX ? YYTRANSLATE[yychar] : YYBADCH)
+$if -t
+				YYTRACE_READ(yychar)
+$endif
+			end
+			yyn = YYBASE[yystate] + yychar
+			go_next = (yyn >= 0 && yyn < YYLAST && YYCHECK[yyn] == yychar)
+			unless go_next
+				go_next = yystate < YY2TBLSTATE
+				if go_next
+					yyn = YYBASE[yystate + YYNLSTATES] + yychar
+					go_next = (yyn >= 0 && yyn < YYLAST && YYCHECK[yyn] == yychar)
+				end
+			end
+			if go_next
+				yyn = YYACTION[yyn]
+				go_next = yyn != YYDEFAULT
+			end
+			if go_next
+				# >= YYNLSTATE: shift and reduce
+				# > 0: shift
+				# = 0: accept
+				# < 0: reduce
+				# = -YYUNEXPECTED: error
+				if yyn > 0
+					# shift
+$if -t
+					YYTRACE_SHIFT(yychar)
+$endif
+					yysp = yysp + 1
+
+					yysstk[yysp] = yystate = yyn
+					yyastk[yysp] = @yylval
+					yychar = -1
+					
+					yyerrflag -= 1 if yyerrflag > 0
+					next if yyn < YYNLSTATES
+					# yyn >= YYNLSTATES means shift-and-reduce
+					yyn -= YYNLSTATES
+				else
+					yyn = -yyn
+				end
+			else
+				yyn = YYDEFAULTS[yystate]
+			end
+		end
+		
+		while true
+			# reduce/error
+			if yyn == 0
+				# accept
+$if -t
+				YYTRACE_ACCEPT()
+$endif
+				return 0
+			elsif yyn != YYUNEXPECTED
+				# reduce
+				yyl = YYLEN[yyn]
+				yyval = yyastk[yysp-yyl+1]
+$if -t
+				YYTRACE_REDUCE(yyn)
+$endif
+				# Following line will be replaced by reduce actions
+$reduce
+				if yyn == %n
+					%b
+				end
+$endreduce
+				# Goto - shift nonterminal
+				yysp -= yyl
+				yyn = YYLHS[yyn]
+				yyp = YYGBASE[yyn] + yysstk[yysp]
+				if yyp >= 0 && yyp < YYGLAST && YYGCHECK[yyp] == yyn
+					yystate = YYGOTO[yyp]
+				else
+					yystate = YYGDEFAULTS[yyn]
+				end
+					
+				yysp = yysp + 1
+
+				yysstk[yysp] = yystate
+				yyastk[yysp] = yyval
+			else
+				# error
+				yyerror "syntax error" if yyerrflag == 0
+				case yyerrflag
+				when 0..2
+					yyerrflag = 3
+					# Pop until error-expecting state uncovered
+					while true
+						yyn = YYBASE[yystate] + YYINTERRTOK
+						b = (yyn >= 0 && yyn < YYLAST && YYCHECK[yyn] == YYINTERRTOK)
+						unless b
+							b = yystate < YY2TBLSTATE
+							if b
+								yyn = YYBASE[yystate + YYNLSTATES] + YYINTERRTOK
+								b = (yyn >= 0 && yyn < YYLAST && YYCHECK[yyn] == YYINTERRTOK)
+							end
+						end
+						break unless b
+						return 1 if yysp <= 0
+						yysp -= yysp
+						yystate = yysstk[yysp]
+$if -t
+						YYTRACE_POP(yystate)
+$endif
+					end
+					yyn = YYACTION[yyn]
+$if -t
+					YYTRACE_SHIFT(YYINTERRTOK)
+$endif
+					yysp += 1
+					yystate = yyn
+					yysstk[yysp] = yyn
+				when 3
+$if -t
+					YYTRACE_DISCARD(yychar)
+$endif
+					return 1if yychar == 0
+					yychar = -1
+				end
+			end	
+			break if yystate < YYNLSTATES
+			# >= YYNLSTATES means shift-and-reduce
+			yyn = yystate - YYNLSTATES
+		end
+	end
+end
+
+$tailcode
