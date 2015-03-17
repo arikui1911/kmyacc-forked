@@ -37,6 +37,10 @@ $endtokenval
       @yylexer.yylex @yylval_updater
     end
 
+    def yyerror(msg)
+      @yylexer.yyerror msg
+    end
+
     def yyclearin
       @yychar = -1
     end
@@ -50,10 +54,12 @@ $endtokenval
     end
 
     def YYERROR
-      goto yyerrlab
+      @yyparseerror = true
     end
 
     YYDEFAULTSTACK = 512
+
+    public
 
     def yyparse
       r = 0...YYDEFAULTSTACK
@@ -131,8 +137,11 @@ $if -t
             YYTRACE_ACCEPT()
 $endif
             return 0
-          elsif yyn != YYUNEXPECTED
+          end
+          @yyparseerror = true
+          if yyn != YYUNEXPECTED
             # reduce
+            @yyparseerror = false
             yyl = YYLEN[yyn]
             @yyval = @yyastk[yysp-yyl+1]
 $if -t
@@ -145,20 +154,23 @@ $reduce
             end
 $endreduce
             # Goto - shift nonterminal
-            yysp -= yyl
-            yyn = YYLHS[yyn]
-            yyp = YYGBASE[yyn] + yysstk[yysp]
-            if yyp >= 0 && yyp < YYGLAST && YYGCHECK[yyp] == yyn
-              yystate = YYGOTO[yyp]
-            else
-              yystate = YYGDEFAULTS[yyn]
+            unless @yyparseerror
+              yysp -= yyl
+              yyn = YYLHS[yyn]
+              yyp = YYGBASE[yyn] + yysstk[yysp]
+              if yyp >= 0 && yyp < YYGLAST && YYGCHECK[yyp] == yyn
+                yystate = YYGOTO[yyp]
+              else
+                yystate = YYGDEFAULTS[yyn]
+              end
+
+              yysp += 1
+
+              yysstk[yysp] = yystate
+              @yyastk[yysp] = @yyval
             end
-
-            yysp += 1
-
-            yysstk[yysp] = yystate
-            @yyastk[yysp] = @yyval
-          else
+          end
+          if @yyparseerror
             # error
             yyerror "syntax error" if @yyerrflag == 0
             case @yyerrflag
@@ -267,6 +279,8 @@ $endif
     YYDEFAULT = $(YYDEFAULT)
 
 $if -t
+    private
+
     def yytracef
       @YYTRACEF ||= STDERR
     end
