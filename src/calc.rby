@@ -51,14 +51,12 @@ primary : NUMBER_LITERAL
 
 module Calc
   class Lexer
-    include ParserObservable
-
     def initialize(src)
       @src = src
-      @iter = lex()
     end
 
-    def yylex
+    def yylex(yylval_updater)
+      @iter ||= lex(yylval_updater)
       @iter.next
     end
 
@@ -71,8 +69,8 @@ module Calc
       '/' => Tokens.DIV,
     }
 
-    def lex
-      return enum_for(__method__) unless block_given?
+    def lex(yylval_updater)
+      return enum_for(__method__, yylval_updater) unless block_given?
       @src.each_line do |line|
         rest = line
         until rest.empty?
@@ -80,7 +78,7 @@ module Calc
           when /\A[\r\n\s]+/
             ;
           when /\A\d+\.\d+/, /\A\d+/
-            yylval_set Float($&)
+            yylval_updater.call Float($&)
             yield Tokens.NUMBER_LITERAL
           when /\A[\+\-\*\/]/
             yield OP.fetch($&)

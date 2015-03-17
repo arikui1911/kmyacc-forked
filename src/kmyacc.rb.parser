@@ -8,8 +8,6 @@ $semval(%n)    @yyastk[yysp-(%l-%n)]
 $semval(%n,%t) @yyastk[yysp-(%l-%n)]
 $include
 
-require 'observer'
-
 module $(CLASSNAME_CAMEL)
   module Tokens
     TOKENS = {
@@ -28,31 +26,15 @@ $endtokenval
     end
   end
 
-  module ParserObservable
-    include Observable
-
-    attr_reader :yylval
-
-    def yylval_set(v)
-      @yylval = v
-      changed
-      notify_observers(self)
-    end
-  end
-
   class Parser
     def initialize(lexer, debug: false)
-      @lexer    = lexer
-      @yydebug  = debug
-      @lexer.add_observer self
+      @yylexer = lexer
+      @yydebug = debug
+      @yylval_updater = ->(v){ @yylval = v }
     end
 
     def yylex
-      @lexer.yylex
-    end
-
-    def update(lexer)
-      @yylval = lexer.yylval
+      @yylexer.yylex @yylval_updater
     end
 
     YYDEFAULTSTACK = 512
