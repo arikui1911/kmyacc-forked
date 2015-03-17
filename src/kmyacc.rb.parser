@@ -105,12 +105,12 @@ $endif
 $if -t
               YYTRACE_SHIFT(@yychar)
 $endif
-              yysp = yysp + 1
+              yysp += 1
 
               yysstk[yysp] = yystate = yyn
               @yyastk[yysp] = @yylval
               @yychar = -1
-              
+
               @yyerrflag -= 1 if @yyerrflag > 0
               next if yyn < YYNLSTATES
               # yyn >= YYNLSTATES means shift-and-reduce
@@ -122,7 +122,7 @@ $endif
             yyn = YYDEFAULTS[yystate]
           end
         end
-        
+
         while true
           # reduce/error
           if yyn == 0
@@ -153,8 +153,8 @@ $endreduce
             else
               yystate = YYGDEFAULTS[yyn]
             end
-              
-            yysp = yysp + 1
+
+            yysp += 1
 
             yysstk[yysp] = yystate
             @yyastk[yysp] = @yyval
@@ -194,10 +194,10 @@ $endif
 $if -t
               YYTRACE_DISCARD(@yychar)
 $endif
-              return 1if @yychar == 0
+              return 1 if @yychar == 0
               @yychar = -1
             end
-          end  
+          end
           break if yystate < YYNLSTATES
           # >= YYNLSTATES means shift-and-reduce
           yyn = yystate - YYNLSTATES
