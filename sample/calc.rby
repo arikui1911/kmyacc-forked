@@ -1,0 +1,108 @@
+%{
+%}
+
+%token ADD SUB MUL DIV CR NUMBER_LITERAL
+
+%%
+
+program :
+        | line_list
+        ;
+
+line_list : line
+          | line_list line
+          ;
+
+line : CR
+     | expr CR
+     {
+         puts(">>> %f" % $1)
+     }
+     ;
+
+expr : term
+     | expr ADD term
+     {
+         $$ = $1 + $3
+     }
+     | expr SUB term
+     {
+         $$ = $1 - $3
+     }
+     ;
+
+term : primary
+     | term MUL primary
+     {
+         $$ = $1 * $3
+     }
+     | term DIV primary
+     {
+         $$ = $1 / $3
+     }
+     ;
+
+primary : NUMBER_LITERAL
+        ;
+
+%%
+
+#"
+
+module Calc
+  class Lexer
+    def initialize(src)
+      @src = src
+    end
+
+    def yylex(yylval_updater)
+      @iter ||= lex(yylval_updater)
+      @iter.next
+    end
+
+    def yyerror(msg)
+      $stderr.puts "Error: #{msg}"
+    end
+
+    private
+
+    OP = {
+      '+' => Tokens.ADD,
+      '-' => Tokens.SUB,
+      '*' => Tokens.MUL,
+      '/' => Tokens.DIV,
+    }
+
+    def lex(yylval_updater)
+      return enum_for(__method__, yylval_updater) unless block_given?
+      @src.each_line do |line|
+        rest = line
+        until rest.empty?
+          case rest
+          when /\A[\r\n\s]+/
+            ;
+          when /\A\d+\.\d+/, /\A\d+/
+            yylval_updater.call Float($&)
+            yield Tokens.NUMBER_LITERAL
+          when /\A[\+\-\*\/]/
+            yield OP.fetch($&)
+          when /\A./
+            raise "invalid character - `#{$&}'"
+          else
+            raise Exception, 'must not happen'
+          end
+          rest = $'
+        end
+        yield Tokens.CR
+      end
+      while true
+        yield 0
+      end
+    end
+  end
+end
+
+
+lexer = Calc::Lexer.new($stdin)
+parser = Calc::Parser.new(lexer, debug: true)
+parser.yyparse
