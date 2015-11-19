@@ -81,7 +81,7 @@ struct thash {
   char body[1];
 };
 #define NHASHROOT 512
-Thash *hashtbl[NHASHROOT];
+static Thash *hashtbl[NHASHROOT];
 
 
 /* Return string p's hash value */
@@ -125,8 +125,8 @@ global char *intern_token(char *s)
 global char *token_text;
 global int token_type;
 
-private int back_token_type;
-private char *back_token_text;
+static int back_token_type;
+static char *back_token_text;
 
 #define MAXTOKEN 50000
 

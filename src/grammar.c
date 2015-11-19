@@ -99,7 +99,7 @@ static char M_SYNTAX[] = "Syntax error near '%s'";
 #define hash(s) (((unsigned)s) >> 3)
 
 /* Return a symbol which corresponds to string s */
-Symbol *intern(char *s)
+static Symbol *intern(char *s)
 {
   Symbol *p, **root;
     
@@ -126,7 +126,7 @@ Symbol *intern(char *s)
 
 
 /* Return value of C character sequence s */
-int charval(char *s)
+static int charval(char *s)
 {
   int val;
   int c;
@@ -163,7 +163,7 @@ int charval(char *s)
 
 
 /* Return grammar id for string s, register if new */
-Gsym intern_gsym(char *s, bool term)
+static Gsym intern_gsym(char *s, bool term)
 {
   Symbol *p;
     
@@ -198,7 +198,7 @@ Gsym intern_gsym(char *s, bool term)
 
 
 /* Return unique nonterminal id */
-Gsym gen_nont()
+static Gsym gen_nont()
 {
   static int n = 1;
   char buf[6];
@@ -211,7 +211,7 @@ Gsym gen_nont()
 /* Read <typename> in %type/%token, etc.
  * return interned string between balanced <>.
  */
-Symbol *gettype()
+static Symbol *gettype()
 {
   char buf[256], *p, *ps;
   int ct, left, len;
@@ -258,7 +258,7 @@ Symbol *gettype()
 
 
 /* Return length of production p */
-global int length(Gsym *p)
+int length(Gsym *p)
 {
   int n;
     
@@ -270,7 +270,7 @@ global int length(Gsym *p)
 
 
 /* Process %token, %left, %right, %nonassoc */
-void do_token(int tag)
+static void do_token(int tag)
 {
   Symbol *type, *p;
   int precincr = 0;
@@ -313,7 +313,7 @@ void do_token(int tag)
 
 
 /* Process %type statement */
-void do_type()
+static void do_type()
 {
   Symbol *type, *p;
   char t;
@@ -333,7 +333,7 @@ void do_type()
 
 
 /* Get block text surrounded by { ... } */
-Flexstr *get_block_body()
+static Flexstr *get_block_body()
 {
   Flexstr *flap = new_flexstr(128);
   int ct;
@@ -361,7 +361,7 @@ Flexstr *get_block_body()
 
 
 /* Process %union statement */
-void do_union()
+static void do_union()
 {
   Flexstr *flap;
 
@@ -374,7 +374,7 @@ void do_union()
 
 
 /* Copy source text surrounded by %{ ... %} */
-void do_copy()
+static void do_copy()
 {
   parser_begin_copying();
   while (raw_gettoken() != ENDINC)
@@ -385,7 +385,7 @@ void do_copy()
 
 
 /* Process declaration part */
-global void do_declaration()
+void do_declaration()
 {
   int t;
   int i;
@@ -454,7 +454,7 @@ global void do_declaration()
 
 
 /* Read action */
-char *copyact(Gsym *g, int n, int delm, char *attrname[])
+static char *copyact(Gsym *g, int n, int delm, char *attrname[])
 {
   Flexstr *flap = new_flexstr(128);
   int tok;
@@ -555,7 +555,7 @@ char *copyact(Gsym *g, int n, int delm, char *attrname[])
 
 
 /* Read grammar */
-global void do_grammar()
+void do_grammar()
 {
   Gsym gbuf[100], lastterm, w;
   char *attrname[100];

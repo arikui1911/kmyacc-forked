@@ -111,7 +111,7 @@ private uchar (*follow)[(MAXTERM + NBITS - 1) / NBITS];
 
 
 /* Let set d = set d OR set s */
-bool orbits(uchar *d, uchar *s)
+static bool orbits(uchar *d, uchar *s)
 {
   bool changed;
   int i;
@@ -133,7 +133,7 @@ bool orbits(uchar *d, uchar *s)
     for (v = 0; (v = next_elem(v, set)) < nterms; v++)
 
 /* Return an element next to e in set p */
-Gsym next_elem(Gsym e, uchar *p)
+static Gsym next_elem(Gsym e, uchar *p)
 {
   for (; e < nterms; e++) {
     if (tbit(p, e))
@@ -144,7 +144,7 @@ Gsym next_elem(Gsym e, uchar *p)
 
 
 /* Dump set */
-void dump_set(uchar *set)
+static void dump_set(uchar *set)
 {
   Gsym x;
     
@@ -156,7 +156,7 @@ void dump_set(uchar *set)
 
 
 /* Return production number of Item p */
-int item2pnum(Gsym *p)
+static int item2pnum(Gsym *p)
 {
   int i;
     
@@ -172,7 +172,7 @@ int item2pnum(Gsym *p)
 
 
 /* Print Item s */
-void write_item(Item s)
+static void write_item(Item s)
 {
   Item p;
     
@@ -197,7 +197,7 @@ void write_item(Item s)
 /* Precompute FIRST & NULLABLE for each nonterminals */
 
     
-void first_nullable_precomp()
+static void first_nullable_precomp()
 {
   int i;
   Gsym g, h, *s;
@@ -243,7 +243,7 @@ void first_nullable_precomp()
 
 /* Precompute nonterminals that reaches A -> empty */
 
-void comp_empty()
+static void comp_empty()
 {
   int i;
   bool changed;
@@ -282,7 +282,7 @@ private int bytes_LA;
 #define tailitem(item) ((item)[0] == 0)
 
 /* Return non-zero if item set p and t are same */
-bool sameset(LR1 *p, LR1 *t)
+static bool sameset(LR1 *p, LR1 *t)
 {
   while (t != NULL) {
     if (p == NULL || p->item != t->item)
@@ -297,7 +297,7 @@ bool sameset(LR1 *p, LR1 *t)
 private LR1 *freelist = NULL;
 
 /* Free unnecessary item objects. */
-void free_items(LR1 *list)
+static void free_items(LR1 *list)
 {
   LR1 *p;
 
@@ -312,7 +312,7 @@ void free_items(LR1 *list)
 
 
 /* Return new LR(1) item object. */
-LR1 *alloc_item()
+static LR1 *alloc_item()
 {
   LR1 *p = freelist;
   if (p != NULL) {
@@ -333,7 +333,7 @@ LR1 *alloc_item()
 
 
 /* find and apppend empty-productions derived from nonterminal x */
-LR1 *find_empty(LR1 *tail, Gsym x)
+static LR1 *find_empty(LR1 *tail, Gsym x)
 {
   LR1 *p;
   int i;
@@ -359,7 +359,7 @@ LR1 *find_empty(LR1 *tail, Gsym x)
 
 
 /* Return LR(1) set of items */
-LR1 *make_state(LR1 *items)
+static LR1 *make_state(LR1 *items)
 {
   LR1 *p, *q, *tail;
   Gsym g;
@@ -396,7 +396,7 @@ LR1 *make_state(LR1 *items)
 
 
 
-int cmp_LR1(LR1 *x, LR1 *y)
+static int cmp_LR1(LR1 *x, LR1 *y)
 {
   int w;
     
@@ -410,7 +410,7 @@ int cmp_LR1(LR1 *x, LR1 *y)
 
 
 /* Compare states */
-int cmp_state(State *p, State *q)
+static int cmp_state(State *p, State *q)
 {
   State *x;
   int pn, pt, qn, qt, i;
@@ -440,7 +440,7 @@ int cmp_state(State *p, State *q)
 
 
 
-void link_state(State *s, Gsym g)
+static void link_state(State *s, Gsym g)
 {
   List *chain = alloc(sizeof(List));
   chain->next = states_thru[g];
@@ -452,7 +452,7 @@ void link_state(State *s, Gsym g)
 
 
 /* Make LR(0) items (kernel only) */
-void comp_kernels()
+static void comp_kernels()
 {
   LR1 *x;
   Gsym g;
@@ -566,7 +566,7 @@ void comp_kernels()
 
 
 /* Compute FIRST set of sequence s into p */
-void comp_first(uchar *p, Gsym *s)
+static void comp_first(uchar *p, Gsym *s)
 {
   Gsym g;
     
@@ -583,7 +583,7 @@ void comp_first(uchar *p, Gsym *s)
 
 
 /* Return non-zero if grammar sequence s could be empty */
-bool seq_nullable(Gsym *s)
+static bool seq_nullable(Gsym *s)
 {
   Gsym g;
     
@@ -598,7 +598,7 @@ bool seq_nullable(Gsym *s)
 
 
 /* Compute FOLLOW set into follow */
-void comp_follow(State *st)
+static void comp_follow(State *st)
 {
   uchar *p;
   State **t;
@@ -633,7 +633,7 @@ void comp_follow(State *st)
 
 
 /* Compute lookahead for each state */
-void comp_lookaheads()
+static void comp_lookaheads()
 {
   LR1 *x, *y;
   Gsym g, *s;
@@ -689,7 +689,7 @@ void comp_lookaheads()
 
 /* Compare precedence of production (pnum) and grammar symbol x */
 #define NON_ASSOC -32768
-int cmpprec(int pnum, Gsym x)
+static int cmpprec(int pnum, Gsym x)
 {
   int v;
     
@@ -711,14 +711,14 @@ int cmpprec(int pnum, Gsym x)
 
 
 /* Return true if st is reduce-only state. */
-bool isreduceonly(State *p)
+static bool isreduceonly(State *p)
 {
   return (p->shifts[0] == NULL && p->reduce[0].sym == NILSYM);
 }
 
 
 /* Print transition table for state (st) */
-void print_state(int st)
+static void print_state(int st)
 {
   LR1 *x;
   char *str;
@@ -774,7 +774,7 @@ void print_state(int st)
 
 
 
-int cmp_by_num(const void *x0, const void *y0)
+static int cmp_by_num(const void *x0, const void *y0)
 {
   const Reduce *x = x0, *y = y0;
   if (x->num != y->num)
@@ -783,7 +783,7 @@ int cmp_by_num(const void *x0, const void *y0)
 }
 
 
-int cmp_by_sym(const void *x0, const void *y0)
+static int cmp_by_sym(const void *x0, const void *y0)
 {
   const Reduce *x = x0, *y = y0;
   if (x->sym != y->sym)
@@ -797,7 +797,7 @@ private char rubout[] = "hoge";
 #define RUBOUT ((State *)rubout)
 
 /* Fill reduce entries for each state */
-void fill_reduce()
+static void fill_reduce()
 {
   int i, j, k, m;
   LR1 *x;
@@ -990,7 +990,7 @@ void fill_reduce()
 
 
 
-global void comp_lalr()
+void comp_lalr()
 {
   /* precompute symbols that reach empty production */
   comp_empty();
